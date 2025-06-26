@@ -1,0 +1,52 @@
+# Environment Configuration for Adaptive Robot Navigation
+
+environment:
+  # Grid world dimensions
+  width: 50
+  height: 50
+  
+  # Robot parameters
+  robot:
+    initial_position: [25, 25]  # Starting position
+    max_speed: 1.0              # Maximum movement speed
+    sensor_range: 10            # Sensor detection range
+    
+  # Obstacle parameters
+  obstacles:
+    num_static: 15              # Number of static obstacles
+    num_dynamic: 5              # Number of dynamic obstacles
+    dynamic_speed: 0.5          # Speed of dynamic obstacles
+    obstacle_size: 1.0          # Size of obstacles
+    
+  # Goal parameters
+  goals:
+    num_goals: 3                # Number of goals to reach
+    goal_radius: 2.0            # Success radius around goal
+    goal_reward: 100.0          # Reward for reaching goal
+    
+  # Sensor parameters
+  sensors:
+    lidar:
+      num_rays: 36              # Number of LIDAR rays
+      max_range: 10.0           # Maximum LIDAR range
+      noise_std: 0.1            # LIDAR noise standard deviation
+      
+    camera:
+      resolution: [64, 64]      # Camera resolution
+      field_of_view: 90         # Field of view in degrees
+      noise_std: 0.05           # Camera noise standard deviation
+      
+    imu:
+      noise_std: 0.01           # IMU noise standard deviation
+      
+  # Physics parameters
+  physics:
+    collision_penalty: -10.0     # Penalty for collisions
+    step_penalty: -0.1          # Small penalty per step
+    max_steps: 1000             # Maximum steps per episode
+    
+  # Dynamic environment
+  dynamics:
+    obstacle_movement: true     # Enable dynamic obstacles
+    goal_changes: true          # Enable goal changes
+    change_frequency: 100       # Steps between changes 

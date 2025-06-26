@@ -1,0 +1,68 @@
+# Agent Configuration for Active Inference
+
+agent:
+  # Active inference parameters
+  active_inference:
+    # Belief update parameters
+    learning_rate: 0.01          # Learning rate for belief updates
+    precision: 1.0               # Precision of observations
+    temperature: 1.0             # Temperature for policy selection
+    
+    # Generative model parameters
+    state_dim: 64                # Dimension of hidden states
+    observation_dim: 4142        # Dimension of observations
+    action_dim: 4                # Number of possible actions
+    
+    # Variational inference parameters
+    num_samples: 10              # Number of samples for variational inference
+    kl_weight: 1.0               # Weight for KL divergence term
+    
+  # Policy parameters
+  policy:
+    exploration_rate: 0.1        # Initial exploration rate
+    exploration_decay: 0.995     # Exploration rate decay
+    min_exploration_rate: 0.01   # Minimum exploration rate
+    
+    # Expected Free Energy parameters
+    efe_weight: 1.0              # Weight for expected free energy
+    information_gain_weight: 0.5 # Weight for information gain
+    utility_weight: 0.5          # Weight for utility
+    
+  # Neural network parameters
+  neural_networks:
+    # Generative model network
+    generative:
+      hidden_dims: [128, 64, 32] # Hidden layer dimensions
+      activation: "relu"          # Activation function
+      dropout: 0.1               # Dropout rate
+      
+    # Recognition model network  
+    recognition:
+      hidden_dims: [128, 64, 32] # Hidden layer dimensions
+      activation: "relu"          # Activation function
+      dropout: 0.1               # Dropout rate
+      
+    # Policy network
+    policy:
+      hidden_dims: [64, 32]      # Hidden layer dimensions
+      activation: "relu"          # Activation function
+      
+  # Training parameters
+  training:
+    batch_size: 32               # Batch size for training
+    update_frequency: 10         # Steps between network updates
+    target_update_frequency: 100 # Steps between target network updates
+    memory_size: 10000           # Replay buffer size
+    
+  # Optimization parameters
+  optimization:
+    optimizer: "adam"            # Optimizer type
+    learning_rate: 0.001         # Learning rate
+    weight_decay: 0.00001        # Weight decay (float, not string)
+    gradient_clip: 1.0           # Gradient clipping
+    
+  # Evaluation parameters
+  evaluation:
+    eval_frequency: 1000         # Steps between evaluations
+    num_eval_episodes: 10        # Number of evaluation episodes
+    save_frequency: 5000         # Steps between model saves 
