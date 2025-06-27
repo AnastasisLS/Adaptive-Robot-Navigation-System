@@ -14,6 +14,7 @@ from tqdm import tqdm
 import time
 import os
 from typing import Dict, List, Any, Tuple
+import csv
 
 from src.environment import NavigationEnvironment
 from src.agents import ActiveInferenceAgent, PPOAgent, DQNAgent, CustomDQNAgent
@@ -24,7 +25,7 @@ class ComparisonExperiment:
     Comprehensive comparison experiment between active inference and RL methods.
     """
     
-    def __init__(self, num_episodes: int = 50, max_steps: int = 500):
+    def __init__(self, num_episodes: int = 500, max_steps: int = 1000):
         """
         Initialize comparison experiment.
         
@@ -95,25 +96,43 @@ class ComparisonExperiment:
         results = []
         
         for episode in tqdm(range(self.num_episodes), desc=f"Training {agent_name}"):
+            # === Curriculum learning: adjust difficulty ===
+            if episode < 100:
+                self.env.config['obstacles']['num_static'] = 2
+                self.env.config['obstacles']['num_dynamic'] = 0
+                self.env.config['goals']['goal_radius'] = 5.0
+            elif episode < 200:
+                self.env.config['obstacles']['num_static'] = 4
+                self.env.config['obstacles']['num_dynamic'] = 1
+                self.env.config['goals']['goal_radius'] = 4.0
+            elif episode < 300:
+                self.env.config['obstacles']['num_static'] = 6
+                self.env.config['obstacles']['num_dynamic'] = 2
+                self.env.config['goals']['goal_radius'] = 3.0
+            elif episode < 400:
+                self.env.config['obstacles']['num_static'] = 8
+                self.env.config['obstacles']['num_dynamic'] = 3
+                self.env.config['goals']['goal_radius'] = 2.0
+            else:
+                self.env.config['obstacles']['num_static'] = 10
+                self.env.config['obstacles']['num_dynamic'] = 4
+                self.env.config['goals']['goal_radius'] = 1.5
+            print(f"\n{agent_name} Episode {episode + 1}/{self.num_episodes} (Static: {self.env.config['obstacles']['num_static']}, Dynamic: {self.env.config['obstacles']['num_dynamic']}, Goal radius: {self.env.config['goals']['goal_radius']})")
+            
             # Reset environment
             observation = self.env.reset()
             episode_reward = 0
             episode_length = 0
             episode_success = False
             episode_collision = False
+            trajectory = []
             
             # Run episode
             for step in range(self.max_steps):
-                # Select action
+                trajectory.append(self.env.robot.position.copy())
                 action = agent.select_action(observation, training=True)
-                
-                # Take step in environment
                 next_observation, reward, done, info = self.env.step(action)
-                
-                # Update agent
                 agent.step(observation, reward, done, info)
-                
-                # Update statistics
                 episode_reward += reward
                 episode_length += 1
                 
@@ -143,6 +162,9 @@ class ComparisonExperiment:
             
             results.append(episode_result)
             
+            # Save trajectory for this episode
+            np.save(f"data/experiments/{agent_name.lower().replace(' ', '_')}_trajectory_episode_{episode+1}.npy", np.array(trajectory))
+            
             # Print progress
             if (episode + 1) % 10 == 0:
                 recent_rewards = [r['reward'] for r in results[-10:]]
@@ -150,6 +172,16 @@ class ComparisonExperiment:
                 avg_reward = np.mean(recent_rewards)
                 success_rate = np.mean(recent_successes)
                 print(f"  Episode {episode + 1}: Avg Reward = {avg_reward:.2f}, Success Rate = {success_rate:.2f}")
+        
+            # Save all metrics to CSV for this agent
+            csv_path = f"data/experiments/{agent_name.lower().replace(' ', '_')}_metrics.csv"
+            with open(csv_path, 'w', newline='') as csvfile:
+                fieldnames = list(results[0].keys())
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for m in results:
+                    writer.writerow(m)
+            print(f"Metrics saved to {csv_path}")
         
         return results
     
@@ -432,7 +464,7 @@ def main():
     os.makedirs("data/experiments", exist_ok=True)
     
     # Run experiment
-    experiment = ComparisonExperiment(num_episodes=30, max_steps=400)
+    experiment = ComparisonExperiment(num_episodes=500, max_steps=1000)
     results = experiment.run_experiment()
     
     # Analyze results

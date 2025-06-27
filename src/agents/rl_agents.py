@@ -474,20 +474,20 @@ class CustomDQNAgent:
                         reward: float, next_observation: np.ndarray, done: bool):
         """
         Store experience in replay buffer.
-        
-        Args:
-            observation: Current observation
-            action: Taken action
-            reward: Received reward
-            next_observation: Next observation
-            done: Whether episode is done
         """
+        # Validate experience
+        if (observation is None or next_observation is None or
+            not isinstance(action, int) or
+            not isinstance(reward, (float, int)) or
+            not isinstance(done, (bool, np.bool_))):
+            print(f"[WARNING] Invalid experience not stored: obs={observation}, action={action}, reward={reward}, next_obs={next_observation}, done={done}")
+            return
         self.memory.append({
             'observation': observation,
             'action': action,
-            'reward': reward,
+            'reward': float(reward),
             'next_observation': next_observation,
-            'done': done
+            'done': bool(done)
         })
     
     def update_models(self) -> Dict[str, float]:
@@ -500,43 +500,54 @@ class CustomDQNAgent:
         if len(self.memory) < self.batch_size:
             return {}
         
-        # Sample batch from memory
-        batch = random.sample(self.memory, self.batch_size)
-        
-        # Prepare batch data
-        observations = torch.FloatTensor([exp['observation'] for exp in batch]).to(self.device)
-        actions = torch.LongTensor([exp['action'] for exp in batch]).to(self.device)
-        rewards = torch.FloatTensor([exp['reward'] for exp in batch]).to(self.device)
-        next_observations = torch.FloatTensor([exp['next_observation'] for exp in batch]).to(self.device)
-        dones = torch.BoolTensor([exp['done'] for exp in batch]).to(self.device)
-        
-        # Compute current Q-values
-        current_q_values = self.q_network(observations).gather(1, actions.unsqueeze(1))
-        
-        # Compute target Q-values
-        with torch.no_grad():
-            next_q_values = self.target_network(next_observations).max(1)[0]
-            target_q_values = rewards + (self.gamma * next_q_values * ~dones)
-        
-        # Compute loss
-        loss = F.mse_loss(current_q_values.squeeze(), target_q_values)
-        
-        # Backward pass
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        
-        # Update target network
-        if self.step_count % self.target_update_freq == 0:
-            self.target_network.load_state_dict(self.q_network.state_dict())
-        
-        # Update epsilon
-        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
-        
-        # Store loss
-        self.training_losses.append(loss.item())
-        
-        return {'dqn_loss': loss.item()}
+        try:
+            # Sample batch from memory
+            batch = random.sample(self.memory, self.batch_size)
+            if not isinstance(batch, list):
+                batch = [batch]
+            if not batch or not isinstance(batch[0], dict):
+                print(f"[DEBUG] Malformed batch in DQN update_models: {batch}")
+                return {}
+            
+            # Prepare batch data
+            observations = torch.FloatTensor([exp['observation'] for exp in batch]).to(self.device)
+            actions = torch.LongTensor([exp['action'] for exp in batch]).to(self.device)
+            rewards = torch.FloatTensor([exp['reward'] for exp in batch]).to(self.device)
+            next_observations = torch.FloatTensor([exp['next_observation'] for exp in batch]).to(self.device)
+            dones = torch.BoolTensor([exp['done'] for exp in batch]).to(self.device)
+            
+            # Compute current Q-values
+            current_q_values = self.q_network(observations).gather(1, actions.unsqueeze(1))
+            
+            # Compute target Q-values
+            with torch.no_grad():
+                next_q_values = self.target_network(next_observations).max(1)[0]
+                target_q_values = rewards + (self.gamma * next_q_values * ~dones)
+            
+            # Compute loss
+            loss = F.mse_loss(current_q_values.squeeze(), target_q_values)
+            
+            # Backward pass
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            
+            # Update target network
+            if self.step_count % self.target_update_freq == 0:
+                self.target_network.load_state_dict(self.q_network.state_dict())
+            
+            # Update epsilon
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+            
+            # Store loss
+            self.training_losses.append(loss.item())
+            
+            return {'dqn_loss': loss.item()}
+            
+        except Exception as e:
+            print(f"[ERROR] Exception in DQN update_models batch processing: {e}")
+            print(f"Batch: {batch}")
+            return {}
     
     def step(self, observation: np.ndarray, reward: float, done: bool, 
              info: Dict[str, Any]) -> int:

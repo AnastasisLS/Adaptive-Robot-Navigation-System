@@ -97,6 +97,8 @@ class NavigationEnvironment:
         
         # Initialize environment
         self.reset()
+        
+        self.prev_distance = None  # Track previous distance to goal
     
     def _init_sensors(self):
         """Initialize sensor systems."""
@@ -159,6 +161,13 @@ class NavigationEnvironment:
         # Generate new environment layout
         self._generate_obstacles()
         self._generate_goals()
+        
+        # Set prev_distance to initial distance to goal
+        if self.goals and self.current_goal_idx < len(self.goals):
+            current_goal = self.goals[self.current_goal_idx]
+            self.prev_distance = np.linalg.norm(self.robot.position - current_goal.position)
+        else:
+            self.prev_distance = None
         
         # Get initial observation
         observation = self._get_observation()
@@ -269,8 +278,21 @@ class NavigationEnvironment:
         # Check goal reached
         goal_reached = self._check_goal_reached()
         
+        # Calculate progress-based reward
+        if self.goals and self.current_goal_idx < len(self.goals):
+            current_goal = self.goals[self.current_goal_idx]
+            current_distance = np.linalg.norm(self.robot.position - current_goal.position)
+            if self.prev_distance is not None:
+                progress_reward = self.prev_distance - current_distance
+            else:
+                progress_reward = 0.0
+            self.prev_distance = current_distance
+        else:
+            progress_reward = 0.0
+            self.prev_distance = None
+        
         # Calculate reward
-        reward = self._calculate_reward(collision, goal_reached)
+        reward = self._calculate_reward(collision, goal_reached, progress_reward)
         
         # Check if episode is done
         done = self._is_done(collision, goal_reached)
@@ -291,23 +313,30 @@ class NavigationEnvironment:
         return observation, reward, done, info
     
     def _apply_action(self, action: int):
-        """Apply action to robot."""
+        """Apply action to robot with improved movement."""
         # Action mapping: 0: forward, 1: backward, 2: left, 3: right
         action_angles = [0, np.pi, np.pi/2, -np.pi/2]
         angle = action_angles[action]
         
-        # Calculate new velocity
-        new_velocity = self.max_speed * np.array([
+        # Calculate desired velocity with momentum
+        desired_velocity = self.max_speed * np.array([
             np.cos(self.robot.orientation + angle),
             np.sin(self.robot.orientation + angle)
         ])
         
-        # Update robot state
-        self.robot.velocity = new_velocity
-        self.robot.position += new_velocity
+        # Apply momentum (smooth velocity changes)
+        momentum = 0.8
+        self.robot.velocity = momentum * self.robot.velocity + (1 - momentum) * desired_velocity
         
-        # Update orientation (for IMU)
-        self.robot.orientation += angle * 0.1  # Small orientation change
+        # Update robot position
+        self.robot.position += self.robot.velocity
+        
+        # Update orientation more smoothly
+        orientation_change = angle * 0.05  # Smaller orientation change
+        self.robot.orientation += orientation_change
+        
+        # Normalize orientation to [-pi, pi]
+        self.robot.orientation = np.arctan2(np.sin(self.robot.orientation), np.cos(self.robot.orientation))
         
         # Keep robot within bounds
         self.robot.position = np.clip(
@@ -355,7 +384,7 @@ class NavigationEnvironment:
         return False
     
     def _check_goal_reached(self) -> bool:
-        """Check if current goal has been reached."""
+        """Check if current goal has been reached (loosened logic)."""
         if not self.goals or self.current_goal_idx >= len(self.goals):
             return False
         
@@ -366,43 +395,54 @@ class NavigationEnvironment:
         distance = np.linalg.norm(
             self.robot.position - current_goal.position
         )
-        return distance <= current_goal.radius
+        # Loosen: add a margin to the goal radius
+        margin = 2.0  # units
+        reached = distance <= (current_goal.radius + margin)
+        if reached:
+            print(f"[DEBUG] Goal reached! Robot pos={self.robot.position}, Goal pos={current_goal.position}, Dist={distance:.2f}, Radius+margin={current_goal.radius + margin:.2f}")
+        return reached
     
-    def _calculate_reward(self, collision: bool, goal_reached: bool) -> float:
+    def _calculate_reward(self, collision: bool, goal_reached: bool, progress_reward: float = 0.0) -> float:
         """Calculate reward for current state."""
         reward = 0.0
         
-        # Step penalty
-        reward += self.config['physics']['step_penalty']
+        # Smaller step penalty to encourage exploration
+        reward += self.config['physics']['step_penalty'] * 0.5
         
-        # Collision penalty
+        # Strong collision penalty
         if collision:
             reward += self.config['physics']['collision_penalty']
         
-        # Goal reward
+        # Large goal reward
         if goal_reached:
             current_goal = self.goals[self.current_goal_idx]
             reward += current_goal.reward
             current_goal.active = False  # Deactivate reached goal
         
-        # Distance-based reward (closer to goal = higher reward)
+        # Progress-based reward (distance reduction) - increased weight
+        reward += 5.0 * progress_reward  # Higher weight for progress
+        
+        # Additional reward for being close to goal
         if self.goals and self.current_goal_idx < len(self.goals):
             current_goal = self.goals[self.current_goal_idx]
-            if current_goal.active:
-                distance = np.linalg.norm(
-                    self.robot.position - current_goal.position
-                )
-                reward += 1.0 / (1.0 + distance)  # Closer = higher reward
+            distance = np.linalg.norm(self.robot.position - current_goal.position)
+            if distance < 10.0:  # Within 10 units of goal
+                proximity_reward = (10.0 - distance) * 0.1
+                reward += proximity_reward
         
         return reward
     
     def _is_done(self, collision: bool, goal_reached: bool) -> bool:
         """Check if episode is done."""
+        # Goal reached - end episode immediately
+        if goal_reached:
+            return True
+        
         # Time limit reached
         if self.step_count >= self.max_steps:
             return True
         
-        # All goals reached
+        # All goals reached (backup check)
         if all(not goal.active for goal in self.goals):
             return True
         

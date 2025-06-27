@@ -19,8 +19,8 @@ agent:
     
   # Policy parameters
   policy:
-    exploration_rate: 0.1        # Initial exploration rate
-    exploration_decay: 0.995     # Exploration rate decay
+    exploration_rate: 0.5        # Initial exploration rate (increased)
+    exploration_decay: 0.999     # Slower decay for more exploration
     min_exploration_rate: 0.01   # Minimum exploration rate
     
     # Expected Free Energy parameters

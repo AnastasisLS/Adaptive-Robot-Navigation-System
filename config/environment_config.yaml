@@ -13,15 +13,15 @@ environment:
     
   # Obstacle parameters
   obstacles:
-    num_static: 15              # Number of static obstacles
-    num_dynamic: 5              # Number of dynamic obstacles
-    dynamic_speed: 0.5          # Speed of dynamic obstacles
+    num_static: 10              # Reduced number of static obstacles
+    num_dynamic: 3              # Reduced number of dynamic obstacles
+    dynamic_speed: 0.3          # Slower dynamic obstacles
     obstacle_size: 1.0          # Size of obstacles
     
   # Goal parameters
   goals:
-    num_goals: 3                # Number of goals to reach
-    goal_radius: 2.0            # Success radius around goal
+    num_goals: 2                # Fewer goals to reduce complexity
+    goal_radius: 5.0            # Larger success radius around goal
     goal_reward: 100.0          # Reward for reaching goal
     
   # Sensor parameters
@@ -48,5 +48,5 @@ environment:
   # Dynamic environment
   dynamics:
     obstacle_movement: true     # Enable dynamic obstacles
-    goal_changes: true          # Enable goal changes
-    change_frequency: 100       # Steps between changes 
+    goal_changes: false         # Disable goal changes for now
+    change_frequency: 500       # Steps between changes (if enabled) 

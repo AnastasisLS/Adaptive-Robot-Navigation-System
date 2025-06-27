@@ -154,20 +154,20 @@ class ActiveInferenceAgent:
                         reward: float, next_observation: np.ndarray, done: bool):
         """
         Store experience in replay buffer.
-        
-        Args:
-            observation: Current observation
-            action: Taken action
-            reward: Received reward
-            next_observation: Next observation
-            done: Whether episode is done
         """
+        # Validate experience
+        if (observation is None or next_observation is None or
+            not isinstance(action, int) or
+            not isinstance(reward, (float, int)) or
+            not isinstance(done, (bool, np.bool_))):
+            print(f"[WARNING] Invalid experience not stored: obs={observation}, action={action}, reward={reward}, next_obs={next_observation}, done={done}, step={getattr(self, 'step_count', 'N/A')}, episode={getattr(self, 'episode_count', 'N/A')}")
+            return
         self.memory.append({
             'observation': observation,
             'action': action,
-            'reward': reward,
+            'reward': float(reward),
             'next_observation': next_observation,
-            'done': done
+            'done': bool(done)
         })
     
     def update_models(self) -> Dict[str, float]:

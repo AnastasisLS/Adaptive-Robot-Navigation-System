@@ -118,8 +118,12 @@ class LIDARSensor:
             angle_diff = np.abs(ray_angle - angle_to_obstacle)
             angle_diff = min(angle_diff, 2 * np.pi - angle_diff)
             
+            # Clamp value for arcsin to [-1, 1]
+            arcsin_arg = obstacle.size / obstacle_distance
+            arcsin_arg = np.clip(arcsin_arg, -1.0, 1.0)
+            
             # Check if ray intersects with obstacle
-            if angle_diff <= np.arcsin(obstacle.size / obstacle_distance):
+            if angle_diff <= np.arcsin(arcsin_arg):
                 # Calculate intersection distance
                 # Using the law of cosines
                 cos_angle = np.cos(angle_diff)

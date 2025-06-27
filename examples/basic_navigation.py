@@ -10,13 +10,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from tqdm import tqdm
+import csv
+import os
 
 from src.environment import NavigationEnvironment
 from src.agents import ActiveInferenceAgent
 from src.visualization import NavigationVisualizer
 
 
-def run_basic_navigation(num_episodes: int = 10, max_steps: int = 1000):
+def run_basic_navigation(num_episodes: int = 500, max_steps: int = 1000):
     """
     Run basic navigation experiment.
     
@@ -42,19 +44,51 @@ def run_basic_navigation(num_episodes: int = 10, max_steps: int = 1000):
     episode_rewards = []
     episode_lengths = []
     success_count = 0
+    episode_collisions = []
+    episode_trajectories = []
+    metrics = []
     
     print(f"Starting {num_episodes} episodes of basic navigation...")
     
     for episode in range(num_episodes):
-        print(f"\nEpisode {episode + 1}/{num_episodes}")
+        # === Curriculum learning: adjust difficulty ===
+        if episode < 50:
+            env.config['obstacles']['num_static'] = 1
+            env.config['obstacles']['num_dynamic'] = 0
+            env.config['goals']['goal_radius'] = 10.0  # Very large goal for easy start
+        elif episode < 100:
+            env.config['obstacles']['num_static'] = 2
+            env.config['obstacles']['num_dynamic'] = 0
+            env.config['goals']['goal_radius'] = 7.0
+        elif episode < 200:
+            env.config['obstacles']['num_static'] = 4
+            env.config['obstacles']['num_dynamic'] = 1
+            env.config['goals']['goal_radius'] = 5.0
+        elif episode < 300:
+            env.config['obstacles']['num_static'] = 6
+            env.config['obstacles']['num_dynamic'] = 2
+            env.config['goals']['goal_radius'] = 3.0
+        elif episode < 400:
+            env.config['obstacles']['num_static'] = 8
+            env.config['obstacles']['num_dynamic'] = 3
+            env.config['goals']['goal_radius'] = 2.0
+        else:
+            env.config['obstacles']['num_static'] = 10
+            env.config['obstacles']['num_dynamic'] = 4
+            env.config['goals']['goal_radius'] = 1.5
+        print(f"\nEpisode {episode + 1}/{num_episodes} (Static: {env.config['obstacles']['num_static']}, Dynamic: {env.config['obstacles']['num_dynamic']}, Goal radius: {env.config['goals']['goal_radius']})")
         
         # Reset environment
         observation = env.reset()
         episode_reward = 0
         episode_length = 0
+        collisions = 0
+        trajectory = []
+        step_logs = []  # Per-step logs for this episode
         
         # Run episode
         for step in range(max_steps):
+            trajectory.append(env.robot.position.copy())
             # Select action
             action = agent.select_action(observation, training=True)
             
@@ -67,6 +101,28 @@ def run_basic_navigation(num_episodes: int = 10, max_steps: int = 1000):
             # Update statistics
             episode_reward += reward
             episode_length += 1
+            
+            if info.get('collision', False):
+                collisions += 1
+            
+            # Log step info
+            if env.goals and env.current_goal_idx < len(env.goals):
+                goal_pos = env.goals[env.current_goal_idx].position.copy()
+            else:
+                goal_pos = [None, None]
+            distance = np.linalg.norm(env.robot.position - goal_pos) if goal_pos[0] is not None else None
+            step_logs.append({
+                'step': step + 1,
+                'robot_x': env.robot.position[0],
+                'robot_y': env.robot.position[1],
+                'goal_x': goal_pos[0],
+                'goal_y': goal_pos[1],
+                'distance': distance,
+                'action': action,
+                'reward': reward,
+                'collision': info.get('collision', False),
+                'goal_reached': info.get('goal_reached', False)
+            })
             
             # Visualize (every 10 steps to avoid slowing down)
             if step % 10 == 0:
@@ -87,22 +143,66 @@ def run_basic_navigation(num_episodes: int = 10, max_steps: int = 1000):
         # Store episode statistics
         episode_rewards.append(episode_reward)
         episode_lengths.append(episode_length)
+        episode_collisions.append(collisions)
+        episode_trajectories.append(np.array(trajectory))
+        # Fix: success = 1 if all goals are inactive (i.e., reached), or if info['goal_reached'] is True at done
+        all_goals_reached = env.goals and all(not goal.active for goal in env.goals)
+        episode_success = int(info.get('goal_reached', False) or all_goals_reached)
+        metrics.append({
+            'episode': episode + 1,
+            'reward': episode_reward,
+            'length': episode_length,
+            'collisions': collisions,
+            'success': episode_success
+        })
+        if episode_success:
+            success_count += 1
         
         # Print episode summary
         print(f"  Reward: {episode_reward:.2f}")
         print(f"  Length: {episode_length}")
+        print(f"  Collisions: {collisions}")
         
         # Get training statistics
         stats = agent.get_training_stats()
         if stats:
             print(f"  Avg Free Energy: {stats.get('avg_free_energy', 'N/A'):.4f}")
             print(f"  Exploration Rate: {stats.get('exploration_rate', 'N/A'):.3f}")
+        
+        # Save trajectory for this episode
+        np.save(f"data/experiments/trajectory_episode_{episode+1}.npy", np.array(trajectory))
+        
+        # Save per-step log for this episode
+        step_log_path = f"data/experiments/step_log_episode_{episode+1}.csv"
+        with open(step_log_path, 'w', newline='') as csvfile:
+            fieldnames = ['step', 'robot_x', 'robot_y', 'goal_x', 'goal_y', 'distance', 'action', 'reward', 'collision', 'goal_reached']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in step_logs:
+                writer.writerow(row)
+    
+    # Save all metrics to CSV
+    with open('data/experiments/basic_navigation_metrics.csv', 'w', newline='') as csvfile:
+        fieldnames = ['episode', 'reward', 'length', 'collisions', 'success']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for m in metrics:
+            writer.writerow(m)
+    print("Metrics saved to data/experiments/basic_navigation_metrics.csv")
     
     # Print final statistics
     print(f"\n=== Final Statistics ===")
     print(f"Success Rate: {success_count}/{num_episodes} ({100*success_count/num_episodes:.1f}%)")
     print(f"Average Reward: {np.mean(episode_rewards):.2f} ± {np.std(episode_rewards):.2f}")
     print(f"Average Length: {np.mean(episode_lengths):.1f} ± {np.std(episode_lengths):.1f}")
+    print(f"Average Collisions: {np.mean(episode_collisions):.2f} ± {np.std(episode_collisions):.2f}")
+    # Print first and last 10 episodes for quick inspection
+    print("\nFirst 10 episodes:")
+    for m in metrics[:10]:
+        print(m)
+    print("\nLast 10 episodes:")
+    for m in metrics[-10:]:
+        print(m)
     
     # Plot training curves
     plot_training_curves(episode_rewards, episode_lengths, agent)
@@ -205,12 +305,11 @@ def demonstrate_agent(agent, env, num_demonstrations: int = 3):
 
 if __name__ == "__main__":
     # Create data directories
-    import os
     os.makedirs("data/models", exist_ok=True)
     os.makedirs("data/experiments", exist_ok=True)
     
     # Run basic navigation experiment
-    agent, env = run_basic_navigation(num_episodes=20, max_steps=500)
+    agent, env = run_basic_navigation(num_episodes=500, max_steps=1000)
     
     # Demonstrate trained agent
     demonstrate_agent(agent, env, num_demonstrations=3)
