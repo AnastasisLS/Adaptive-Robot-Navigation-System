@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  experiments:
+    build: .
+    volumes:
+      # Mount results directory to persist data
+      - ./results:/results
+      # Mount config for easy modification
+      - ./config:/app/config
+    environment:
+      - DISPLAY=:99
+      - PYTHONPATH=/app
+    command: ["basic", "500"]  # Run basic experiment with 500 episodes
+    # Uncomment for comparison experiment:
+    # command: ["comparison", "100"]
+    
+  # Optional: Add a service for monitoring/logs
+  monitoring:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./results:/usr/share/nginx/html
+    depends_on:
+      - experiments 

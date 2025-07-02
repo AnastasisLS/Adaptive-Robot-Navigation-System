@@ -87,6 +87,7 @@ class NavigationEnvironment:
         self.step_count = 0
         self.max_steps = self.config['physics']['max_steps']
         self.current_goal_idx = 0
+        self.episode_count = 0  # Track episode number for curriculum
         
         # Action space: [forward, backward, left, right]
         self.action_space = gym.spaces.Discrete(4)
@@ -148,6 +149,9 @@ class NavigationEnvironment:
     
     def reset(self) -> np.ndarray:
         """Reset the environment to initial state."""
+        # Increment episode count for curriculum learning
+        self.episode_count += 1
+        
         # Reset robot state
         self.robot.position = np.array(self.robot_config['initial_position'], dtype=np.float32)
         self.robot.velocity = np.zeros(2, dtype=np.float32)
@@ -158,7 +162,7 @@ class NavigationEnvironment:
         self.step_count = 0
         self.current_goal_idx = 0
         
-        # Generate new environment layout
+        # Generate new environment layout with curriculum learning
         self._generate_obstacles()
         self._generate_goals()
         
@@ -174,20 +178,25 @@ class NavigationEnvironment:
         return observation
     
     def _generate_obstacles(self):
-        """Generate static and dynamic obstacles."""
+        """Generate static and dynamic obstacles with curriculum learning."""
         obstacle_config = self.config['obstacles']
         
         # Clear existing obstacles
         self.static_obstacles.clear()
         self.dynamic_obstacles.clear()
         
+        # Curriculum learning: reduce obstacles in early episodes
+        curriculum_factor = min(1.0, self.episode_count / 50.0)  # Full difficulty after 50 episodes
+        num_static = max(1, int(obstacle_config['num_static'] * curriculum_factor))
+        num_dynamic = max(0, int(obstacle_config['num_dynamic'] * curriculum_factor))
+        
         # Generate static obstacles
-        for _ in range(obstacle_config['num_static']):
+        for _ in range(num_static):
             obstacle = self._generate_random_obstacle(dynamic=False)
             self.static_obstacles.append(obstacle)
         
         # Generate dynamic obstacles
-        for _ in range(obstacle_config['num_dynamic']):
+        for _ in range(num_dynamic):
             obstacle = self._generate_random_obstacle(dynamic=True)
             self.dynamic_obstacles.append(obstacle)
     
@@ -221,22 +230,36 @@ class NavigationEnvironment:
         )
     
     def _generate_goals(self):
-        """Generate goals for the episode."""
+        """Generate goals for the episode with curriculum learning."""
         goal_config = self.config['goals']
         
         self.goals.clear()
         for _ in range(goal_config['num_goals']):
+            # Curriculum learning: make goals closer in early episodes
+            curriculum_factor = min(1.0, self.episode_count / 30.0)  # Full difficulty after 30 episodes
+            min_distance = 5.0 + (10.0 - 5.0) * curriculum_factor  # Start at 5, reach 10 after 30 episodes
+            max_distance = 15.0 + (25.0 - 15.0) * curriculum_factor  # Start at 15, reach 25 after 30 episodes
+            
             # Generate goal position away from obstacles
-            while True:
+            attempts = 0
+            while attempts < 100:  # Prevent infinite loops
                 position = np.random.uniform(
                     [0, 0], 
                     [self.width, self.height]
                 )
                 
-                # Check distance from robot
+                # Check distance from robot with curriculum
                 distance = np.linalg.norm(position - self.robot.position)
-                if distance > 10.0:  # Minimum distance from robot
+                if min_distance <= distance <= max_distance:
                     break
+                attempts += 1
+            
+            # If we couldn't find a good position, use a fallback
+            if attempts >= 100:
+                # Generate a position at the minimum distance
+                angle = np.random.uniform(0, 2 * np.pi)
+                position = self.robot.position + min_distance * np.array([np.cos(angle), np.sin(angle)])
+                position = np.clip(position, [0, 0], [self.width, self.height])
             
             goal = Goal(
                 position=position,
@@ -403,7 +426,7 @@ class NavigationEnvironment:
         return reached
     
     def _calculate_reward(self, collision: bool, goal_reached: bool, progress_reward: float = 0.0) -> float:
-        """Calculate reward for current state."""
+        """Calculate reward for current state with curriculum learning."""
         reward = 0.0
         
         # Smaller step penalty to encourage exploration
@@ -420,15 +443,14 @@ class NavigationEnvironment:
             current_goal.active = False  # Deactivate reached goal
         
         # Progress-based reward (distance reduction) - increased weight
-        reward += 5.0 * progress_reward  # Higher weight for progress
+        reward += progress_reward * 2.0
         
-        # Additional reward for being close to goal
-        if self.goals and self.current_goal_idx < len(self.goals):
-            current_goal = self.goals[self.current_goal_idx]
-            distance = np.linalg.norm(self.robot.position - current_goal.position)
-            if distance < 10.0:  # Within 10 units of goal
-                proximity_reward = (10.0 - distance) * 0.1
-                reward += proximity_reward
+        # Curriculum learning: bonus rewards for early episodes
+        if self.episode_count <= 20:
+            # Bonus for early episodes to encourage exploration
+            reward += 0.1  # Small bonus per step
+            if goal_reached:
+                reward += 50.0  # Large bonus for reaching goals in early episodes
         
         return reward
     
@@ -551,4 +573,18 @@ class NavigationEnvironment:
             cv2.waitKey(1)
             return None
         else:
-            return img 
+            return img
+    
+    def get_curriculum_info(self) -> Dict[str, Any]:
+        """Get current curriculum learning information."""
+        curriculum_factor_obstacles = min(1.0, self.episode_count / 50.0)
+        curriculum_factor_goals = min(1.0, self.episode_count / 30.0)
+        
+        return {
+            'episode_count': self.episode_count,
+            'obstacle_curriculum_factor': curriculum_factor_obstacles,
+            'goal_curriculum_factor': curriculum_factor_goals,
+            'num_static_obstacles': len(self.static_obstacles),
+            'num_dynamic_obstacles': len(self.dynamic_obstacles),
+            'early_episode_bonus': self.episode_count <= 20
+        } 

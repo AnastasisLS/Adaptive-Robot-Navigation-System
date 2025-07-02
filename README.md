@@ -34,17 +34,50 @@ for _ in range(1000):
 
 ## Running Experiments
 
-### Basic Navigation Experiment
+### Local Experiments
+
+#### Basic Navigation Experiment
 ```bash
 python examples/basic_navigation.py
 ```
 This runs a 500-episode experiment with curriculum learning and comprehensive logging.
 
-### Comparison Experiment
+#### Comparison Experiment
 ```bash
 python examples/comparison_experiment.py
 ```
 This compares Active Inference against PPO and DQN baselines.
+
+### Cloud Deployment (Recommended)
+
+For large-scale experiments without keeping your computer on:
+
+#### Quick Start
+```bash
+# Run a 500-episode experiment in the cloud
+bash cloud_setup/aws_deploy.sh basic 500
+
+# Run a comparison experiment
+bash cloud_setup/aws_deploy.sh comparison 100
+```
+
+#### Features
+- **Fully Automated**: Uploads project, launches EC2 instance, runs experiment, downloads results
+- **Cost Effective**: Uses spot instances and auto-termination
+- **Scalable**: Run experiments of any size (5 to 1000+ episodes)
+- **Robust**: Enhanced error capture and detailed logging
+- **Results Ready**: Automatic download of JSON results and training plots
+
+#### Prerequisites
+1. AWS CLI installed and configured
+2. AWS account with EC2 and S3 permissions
+3. See `AWS_QUICK_START.md` for detailed setup instructions
+
+#### Monitoring
+- Real-time progress updates
+- Automatic result download
+- Detailed error analysis
+- S3 storage for all results
 
 ## Project Structure
 - `src/`: Core implementation (environment, agents, active inference)
@@ -60,16 +93,22 @@ This project implements a simulated autonomous robotic agent using the active in
 
 ### Recent Improvements (Latest Version)
 
-1. **Fixed Episode Termination**: Episodes now end immediately when goals are reached, providing accurate success tracking
-2. **Comprehensive Logging**: 
+1. **Cloud Deployment System**: Fully automated AWS deployment for large-scale experiments
+   - One-command deployment: `bash cloud_setup/aws_deploy.sh basic 500`
+   - Cost-effective cloud computing with auto-termination
+   - Enhanced error capture and detailed logging
+   - Automatic result download and analysis
+
+2. **Fixed Episode Termination**: Episodes now end immediately when goals are reached, providing accurate success tracking
+3. **Comprehensive Logging**: 
    - Per-episode metrics (success rate, rewards, collisions)
    - Per-step logs (robot/goal positions, actions, rewards)
    - Trajectory data (.npy files)
    - Real-time debug information
-3. **Curriculum Learning**: Progressive difficulty increase (1→10 obstacles, large→small goal radius)
-4. **Robust Reward Shaping**: Progress-based rewards with collision penalties
-5. **Exploration Optimization**: Adaptive exploration rate with momentum-based movement
-6. **Sensor Improvements**: Fixed LIDAR arcsin warnings and improved obstacle detection
+4. **Curriculum Learning**: Progressive difficulty increase (1→10 obstacles, large→small goal radius)
+5. **Robust Reward Shaping**: Progress-based rewards with collision penalties
+6. **Exploration Optimization**: Adaptive exploration rate with momentum-based movement
+7. **Sensor Improvements**: Fixed LIDAR arcsin warnings and improved obstacle detection
 
 ## Theoretical Background
 
@@ -129,11 +168,17 @@ Active inference is a unified theory of brain function that treats perception, a
 ├── examples/                          # Example scripts
 │   ├── basic_navigation.py            # Basic navigation experiment (500 episodes)
 │   └── comparison_experiment.py       # RL comparison experiment
+├── cloud_setup/                       # Cloud deployment automation
+│   ├── aws_deploy.sh                  # Main deployment script
+│   ├── aws_setup.sh                   # AWS setup helper
+│   └── headless_experiment.py         # Cloud-optimized experiment runner
 ├── docs/                              # Documentation
 │   ├── theory.md                      # Theoretical background
 │   ├── implementation.md              # Implementation details
 │   ├── results.md                     # Experimental results
 │   └── api.md                         # API documentation
+├── AWS_QUICK_START.md                 # AWS setup guide
+├── CLOUD_DEPLOYMENT.md                # Cloud deployment documentation
 └── data/                              # Data and results
     ├── experiments/                   # Experiment results and logs
     │   ├── basic_navigation_metrics.csv    # Per-episode metrics

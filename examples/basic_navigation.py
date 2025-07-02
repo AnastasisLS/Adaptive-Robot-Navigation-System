@@ -51,35 +51,15 @@ def run_basic_navigation(num_episodes: int = 500, max_steps: int = 1000):
     print(f"Starting {num_episodes} episodes of basic navigation...")
     
     for episode in range(num_episodes):
-        # === Curriculum learning: adjust difficulty ===
-        if episode < 50:
-            env.config['obstacles']['num_static'] = 1
-            env.config['obstacles']['num_dynamic'] = 0
-            env.config['goals']['goal_radius'] = 10.0  # Very large goal for easy start
-        elif episode < 100:
-            env.config['obstacles']['num_static'] = 2
-            env.config['obstacles']['num_dynamic'] = 0
-            env.config['goals']['goal_radius'] = 7.0
-        elif episode < 200:
-            env.config['obstacles']['num_static'] = 4
-            env.config['obstacles']['num_dynamic'] = 1
-            env.config['goals']['goal_radius'] = 5.0
-        elif episode < 300:
-            env.config['obstacles']['num_static'] = 6
-            env.config['obstacles']['num_dynamic'] = 2
-            env.config['goals']['goal_radius'] = 3.0
-        elif episode < 400:
-            env.config['obstacles']['num_static'] = 8
-            env.config['obstacles']['num_dynamic'] = 3
-            env.config['goals']['goal_radius'] = 2.0
-        else:
-            env.config['obstacles']['num_static'] = 10
-            env.config['obstacles']['num_dynamic'] = 4
-            env.config['goals']['goal_radius'] = 1.5
-        print(f"\nEpisode {episode + 1}/{num_episodes} (Static: {env.config['obstacles']['num_static']}, Dynamic: {env.config['obstacles']['num_dynamic']}, Goal radius: {env.config['goals']['goal_radius']})")
-        
-        # Reset environment
+        # Reset environment (curriculum learning is handled internally)
         observation = env.reset()
+        
+        # Get curriculum information
+        curriculum_info = env.get_curriculum_info()
+        print(f"\nEpisode {episode + 1}/{num_episodes} (Static: {curriculum_info['num_static_obstacles']}, Dynamic: {curriculum_info['num_dynamic_obstacles']}, Goal radius: {env.config['goals']['goal_radius']})")
+        if curriculum_info['early_episode_bonus']:
+            print(f"[CURRICULUM] Early episode bonus active (episode {curriculum_info['episode_count']})")
+        
         episode_reward = 0
         episode_length = 0
         collisions = 0

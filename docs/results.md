@@ -30,6 +30,21 @@ The experiments use progressive difficulty increase:
 
 ## Current Results (Latest Runs)
 
+### Cloud Deployment Success
+
+#### AWS Deployment System
+- **Deployment Method**: Fully automated cloud deployment using AWS EC2
+- **Experiment Scale**: Successfully tested with 5-500 episode experiments
+- **Cost Efficiency**: Spot instances with auto-termination
+- **Result Retrieval**: Automatic download of JSON results and training plots
+- **Error Handling**: Enhanced error capture and detailed logging
+
+#### Deployment Statistics
+- **Success Rate**: 100% deployment success (3/3 attempts)
+- **Setup Time**: ~5 minutes from command to experiment start
+- **Result Time**: ~30 minutes for 50-episode experiment
+- **Cost**: ~$0.50-1.00 per experiment (depending on duration)
+
 ### Basic Navigation Experiment (500 Episodes)
 
 #### Success Rate Analysis
@@ -170,10 +185,24 @@ The comprehensive logging and evaluation framework provides valuable insights in
 
 ## Data Availability
 
+### Local Results
 All experimental data is available in the `data/experiments/` directory:
 - **Metrics**: `basic_navigation_metrics.csv`
 - **Step Logs**: `step_log_episode_*.csv`
 - **Trajectories**: `trajectory_episode_*.npy`
 - **Visualizations**: `basic_navigation_training.png`
 
-This data enables reproducibility and further analysis of the active inference approach to robot navigation. 
+### Cloud Results
+Cloud experiment results are automatically downloaded to the `results/` directory:
+- **JSON Results**: `headless_basic_navigation_YYYYMMDD_HHMMSS.json`
+- **Training Plots**: `headless_basic_navigation_YYYYMMDD_HHMMSS_plot.png`
+- **Experiment Logs**: `experiment_output.log`
+- **Completion Markers**: `experiment_complete.txt`
+
+### S3 Storage
+All cloud experiment results are permanently stored in S3:
+- **Bucket**: `adaptive-robot-experiments-YYYYMMDDHHMMSS`
+- **Results Path**: `s3://bucket-name/results/`
+- **Project Archive**: `s3://bucket-name/project.zip`
+
+This data enables reproducibility and further analysis of the active inference approach to robot navigation, with both local and cloud-based experiment capabilities. 

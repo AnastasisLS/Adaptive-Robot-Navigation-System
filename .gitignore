@@ -71,4 +71,16 @@ logs/
 
 # Temporary files
 *.tmp
-*.temp 
+*.temp
+
+# Cloud deployment temporary files
+project.zip
+deployment_info.txt
+results/experiment_output.log
+results/experiment_complete.txt
+results/headless_*.json
+results/headless_*.png
+
+# AWS deployment artifacts
+*.pem
+aws_credentials.txt 

@@ -155,13 +155,20 @@ class ActiveInferenceAgent:
         """
         Store experience in replay buffer.
         """
-        # Validate experience
+        # Validate experience - prevent None values from being stored
         if (observation is None or next_observation is None or
             not isinstance(action, int) or
             not isinstance(reward, (float, int)) or
             not isinstance(done, (bool, np.bool_))):
             print(f"[WARNING] Invalid experience not stored: obs={observation}, action={action}, reward={reward}, next_obs={next_observation}, done={done}, step={getattr(self, 'step_count', 'N/A')}, episode={getattr(self, 'episode_count', 'N/A')}")
             return
+        
+        # Ensure observations are numpy arrays
+        if not isinstance(observation, np.ndarray):
+            observation = np.array(observation)
+        if not isinstance(next_observation, np.ndarray):
+            next_observation = np.array(next_observation)
+            
         self.memory.append({
             'observation': observation,
             'action': action,
@@ -169,6 +176,10 @@ class ActiveInferenceAgent:
             'next_observation': next_observation,
             'done': bool(done)
         })
+        
+        # Debug: Print memory size periodically
+        if len(self.memory) % 1000 == 0:  # Changed from 100 to 1000
+            print(f"[DEBUG] Memory size: {len(self.memory)}/{self.memory_size}")
     
     def update_models(self) -> Dict[str, float]:
         """
@@ -187,23 +198,34 @@ class ActiveInferenceAgent:
             if not batch or not isinstance(batch, list) or not isinstance(batch[0], dict):
                 print(f"[DEBUG] Malformed batch in update_models: {batch}")
                 return {}
-            # Prepare batch data
-            observations = torch.FloatTensor([exp['observation'] for exp in batch]).to(self.device)
-            actions = torch.LongTensor([exp['action'] for exp in batch]).to(self.device)
-            rewards = torch.FloatTensor([exp['reward'] for exp in batch]).to(self.device)
-            next_observations = torch.FloatTensor([exp['next_observation'] for exp in batch]).to(self.device)
+            
+            # Optimize tensor creation by converting to numpy arrays first
+            obs_list = [exp['observation'] for exp in batch]
+            next_obs_list = [exp['next_observation'] for exp in batch]
+            actions_list = [exp['action'] for exp in batch]
+            rewards_list = [exp['reward'] for exp in batch]
+            
+            # Convert to numpy arrays first, then to tensors
+            observations = torch.FloatTensor(np.array(obs_list)).to(self.device)
+            next_observations = torch.FloatTensor(np.array(next_obs_list)).to(self.device)
+            actions = torch.LongTensor(np.array(actions_list)).to(self.device)
+            rewards = torch.FloatTensor(np.array(rewards_list)).to(self.device)
+            
         except Exception as e:
             print(f"[ERROR] Exception in update_models batch processing: {e}\nBatch: {batch if 'batch' in locals() else 'N/A'}")
             return {}
+        
         # Infer states using recognition model
         with torch.no_grad():
             current_states = self.recognition_model.sample_states(observations)
             next_states = self.recognition_model.sample_states(next_observations)
+        
         # Update models using variational inference
         losses = self.variational_inference.optimize_models(
             observations, current_states, actions, rewards,
             self.generative_model, self.recognition_model, self.policy_model
         )
+        
         # Store losses
         self.training_losses.append(losses)
         return losses
@@ -252,11 +274,16 @@ class ActiveInferenceAgent:
         Returns:
             Selected action
         """
-        # Store previous experience if available
-        if hasattr(self, 'last_observation') and hasattr(self, 'last_action'):
+        # Store previous experience if available and valid
+        if (hasattr(self, 'last_observation') and hasattr(self, 'last_action') and
+            self.last_observation is not None and self.last_action is not None):
             self.store_experience(
                 self.last_observation, self.last_action, reward, observation, done
             )
+        elif hasattr(self, 'last_observation') and hasattr(self, 'last_action'):
+            # Debug: Track when we skip storing due to None values
+            if self.step_count % 1000 == 0:  # Changed from 100 to 1000
+                print(f"[DEBUG] Skipping experience storage: last_obs={self.last_observation is None}, last_action={self.last_action is None}")
         
         # Select action
         action = self.select_action(observation, training=True)
@@ -275,7 +302,6 @@ class ActiveInferenceAgent:
         
         # Handle episode end
         if done:
-            self.episode_count += 1
             self._on_episode_end()
         
         return action
@@ -289,7 +315,7 @@ class ActiveInferenceAgent:
         self.last_observation = None
         self.last_action = None
         
-        # Update exploration rate
+        # Update exploration rate more gradually
         self.exploration_rate = max(
             self.min_exploration_rate,
             self.exploration_rate * self.exploration_decay
