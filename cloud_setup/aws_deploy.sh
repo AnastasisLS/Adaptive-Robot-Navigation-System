@@ -184,8 +184,20 @@ exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 echo "Starting user data script..."
 
 # Update system
-yum update -y
-yum install -y python3 python3-pip git unzip
+yum update -y || apt-get update -y
+# Install system dependencies for OpenCV and scientific Python
+if command -v yum &> /dev/null; then
+    yum install -y python3 python3-pip git unzip \
+        mesa-libGL mesa-libGL-devel mesa-libGLU mesa-libGLU-devel \
+        libXext libXrender libXtst libXi libSM libXrandr \
+        glib2 glibc libGLU libGLU-devel libGL1 \
+        libglib2.0-0 libgl1-mesa-glx
+elif command -v apt-get &> /dev/null; then
+    apt-get install -y python3 python3-pip git unzip \
+        libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6 \
+        libgl1-mesa-dri libgl1-mesa-dev libglu1-mesa libglu1-mesa-dev \
+        libxrandr2 libxi6
+fi
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -196,9 +208,6 @@ unzip awscliv2.zip
 aws s3 cp s3://BUCKET_NAME/project.zip /home/ec2-user/
 cd /home/ec2-user
 unzip -o project.zip
-
-# Install system dependencies for OpenCV
-yum install -y mesa-libGL mesa-libGL-devel mesa-libGLU mesa-libGLU-devel libXext libXrender libXtst libXi
 
 # Install Python dependencies
 pip3 install --upgrade pip
