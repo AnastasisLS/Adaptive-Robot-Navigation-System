@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
+import subprocess
 
 # Add project to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -92,6 +93,25 @@ def run_headless_basic_navigation(num_episodes=500, max_steps=1000):
             'success': episode_success,
             'curriculum_info': curriculum_info
         })
+        
+        # Progress tracking every 10 episodes
+        if (episode + 1) % 10 == 0 or (episode + 1) == num_episodes:
+            progress = {
+                'current_episode': episode + 1,
+                'total_episodes': num_episodes,
+                'success_count': success_count,
+                'timestamp': datetime.utcnow().isoformat() + 'Z'
+            }
+            with open('progress.txt', 'w') as pf:
+                json.dump(progress, pf, indent=2)
+            # Try to upload to S3 (ignore errors if not on cloud)
+            try:
+                subprocess.run([
+                    'aws', 's3', 'cp', 'progress.txt',
+                    f's3://{os.environ.get("BUCKET_NAME", "adaptive-robot-experiments")}/results/progress.txt'
+                ], check=False)
+            except Exception as e:
+                print(f"[WARNING] Could not upload progress to S3: {e}")
         
         # Print progress every 50 episodes
         if (episode + 1) % 50 == 0:

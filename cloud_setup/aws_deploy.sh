@@ -215,7 +215,6 @@ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.o
 pip3 install numpy scipy matplotlib seaborn pyyaml gym stable-baselines3 opencv-python tqdm pandas scikit-learn pytest
 
 # Install project
-cd "Project 1 - Adaptive Robot Navigation System"
 pip3 install -e .
 
 # Create results directory
