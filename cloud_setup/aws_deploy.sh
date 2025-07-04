@@ -187,16 +187,24 @@ echo "Starting user data script..."
 yum update -y || apt-get update -y
 # Install system dependencies for OpenCV and scientific Python
 if command -v yum &> /dev/null; then
-    yum install -y python3 python3-pip git unzip \
+    yum install -y python38 python38-pip git unzip \
         mesa-libGL mesa-libGL-devel mesa-libGLU mesa-libGLU-devel \
         libXext libXrender libXtst libXi libSM libXrandr \
         glib2 glibc libGLU libGLU-devel libGL1 \
         libglib2.0-0 libgl1-mesa-glx
+    ln -sf /usr/bin/python3.8 /usr/bin/python3
+    ln -sf /usr/bin/pip3.8 /usr/bin/pip3
 elif command -v apt-get &> /dev/null; then
-    apt-get install -y python3 python3-pip git unzip \
+    apt-get update -y
+    apt-get install -y software-properties-common
+    add-apt-repository ppa:deadsnakes/ppa -y
+    apt-get update -y
+    apt-get install -y python3.8 python3.8-distutils python3.8-venv python3.8-dev python3-pip git unzip \
         libgl1-mesa-glx libglib2.0-0 libsm6 libxrender1 libxext6 \
         libgl1-mesa-dri libgl1-mesa-dev libglu1-mesa libglu1-mesa-dev \
         libxrandr2 libxi6
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
+    update-alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.8 1
 fi
 
 # Install AWS CLI v2
