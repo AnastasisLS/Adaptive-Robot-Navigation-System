@@ -185,16 +185,35 @@ echo "Starting user data script..."
 
 # Update system
 yum update -y || apt-get update -y
+
 # Install system dependencies for OpenCV and scientific Python
 if command -v yum &> /dev/null; then
-    yum install -y python38 python38-pip git unzip \
+    # Amazon Linux - install Python 3.8 from source if not available
+    yum install -y git unzip wget gcc gcc-c++ make openssl-devel bzip2-devel libffi-devel zlib-devel \
         mesa-libGL mesa-libGL-devel mesa-libGLU mesa-libGLU-devel \
         libXext libXrender libXtst libXi libSM libXrandr \
         glib2 glibc libGLU libGLU-devel libGL1 \
         libglib2.0-0 libgl1-mesa-glx
-    ln -sf /usr/bin/python3.8 /usr/bin/python3
-    ln -sf /usr/bin/pip3.8 /usr/bin/pip3
+    
+    # Try to install Python 3.8 from package manager first
+    if yum install -y python38 python38-pip 2>/dev/null; then
+        echo "Python 3.8 installed from package manager"
+        ln -sf /usr/bin/python3.8 /usr/bin/python3
+        ln -sf /usr/bin/pip3.8 /usr/bin/pip3
+    else
+        echo "Python 3.8 not available in package manager, installing from source..."
+        cd /tmp
+        wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+        tar xzf Python-3.8.18.tgz
+        cd Python-3.8.18
+        ./configure --enable-optimizations
+        make altinstall
+        ln -sf /usr/local/bin/python3.8 /usr/bin/python3
+        ln -sf /usr/local/bin/pip3.8 /usr/bin/pip3
+        cd /
+    fi
 elif command -v apt-get &> /dev/null; then
+    # Ubuntu - use deadsnakes PPA
     apt-get update -y
     apt-get install -y software-properties-common
     add-apt-repository ppa:deadsnakes/ppa -y
@@ -206,6 +225,13 @@ elif command -v apt-get &> /dev/null; then
     update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 1
     update-alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip3.8 1
 fi
+
+# Verify Python 3.8+ is available
+echo "Verifying Python installation..."
+python3 --version || {
+    echo "ERROR: python3 command not found after installation"
+    exit 1
+}
 
 # Install AWS CLI v2
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
