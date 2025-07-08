@@ -53,17 +53,9 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Data files (large experiment results)
-data/experiments/step_log_episode_*.csv
-data/experiments/trajectory_episode_*.npy
-data/experiments/basic_navigation_metrics.csv
-data/experiments/comparison_results.csv
-data/experiments/comparison_results.png
-data/experiments/basic_navigation_training.png
-data/experiments/comparison_report.txt
-
-# Model files (can be regenerated)
-data/models/*.pth
+# Data files (can be regenerated)
+data/experiments/
+data/models/
 
 # Logs
 *.log
@@ -73,14 +65,7 @@ logs/
 *.tmp
 *.temp
 
-# Cloud deployment temporary files
+# Temporary files
 project.zip
-deployment_info.txt
-results/experiment_output.log
-results/experiment_complete.txt
-results/headless_*.json
-results/headless_*.png
-
-# AWS deployment artifacts
-*.pem
-aws_credentials.txt 
+*.tmp
+*.temp 

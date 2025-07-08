@@ -176,10 +176,6 @@ class ActiveInferenceAgent:
             'next_observation': next_observation,
             'done': bool(done)
         })
-        
-        # Debug: Print memory size periodically
-        if len(self.memory) % 1000 == 0:  # Changed from 100 to 1000
-            print(f"[DEBUG] Memory size: {len(self.memory)}/{self.memory_size}")
     
     def update_models(self) -> Dict[str, float]:
         """
