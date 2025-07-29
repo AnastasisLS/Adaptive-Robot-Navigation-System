@@ -1,7 +1,7 @@
 # AWS Cloud Deployment Guide for Adaptive Robot Navigation System
 
 ## Overview
-This guide will help you deploy your experiments to AWS EC2, allowing you to run long experiments without keeping your computer on. We'll use AWS EC2 with auto-scaling and S3 for result storage.
+This guide provides comprehensive instructions for deploying experiments to AWS EC2, enabling long-running experiments without requiring local computational resources. The deployment utilizes AWS EC2 with auto-scaling and S3 for result storage.
 
 ## Prerequisites
 1. AWS Account (free tier available)
@@ -99,282 +99,188 @@ aws s3 cp project.zip s3://adaptive-robot-experiments-$(date +%s)/project.zip
 
 ### Create Launch Template
 ```bash
-# Get the latest Ubuntu AMI
+# Get latest Ubuntu AMI
 AMI_ID=$(aws ec2 describe-images \
-    --owners 099720109477 \
-    --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-20.04-amd64-server-*" \
-    --query "sort_by(Images, &CreationDate)[-1].ImageId" \
-    --output text)
+  --owners 099720109477 \
+  --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*" \
+  --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+  --output text)
 
-# Create user data script
-cat > user-data.sh << 'EOF'
-#!/bin/bash
-yum update -y
-yum install -y python3 python3-pip git
-
-# Install AWS CLI v2
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-unzip awscliv2.zip
-./aws/install
-
-# Get project from S3
-aws s3 cp s3://BUCKET_NAME/project.zip /home/ec2-user/
-cd /home/ec2-user
-unzip project.zip
-
-# Install dependencies
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip3 install numpy scipy matplotlib seaborn pyyaml gym stable-baselines3 opencv-python tqdm pandas scikit-learn pytest
-
-# Install project
-cd "Project 1 - Adaptive Robot Navigation System"
-pip3 install -e .
-
-# Run experiments
-python3 cloud_setup/headless_experiment.py --experiment basic --episodes 500
-
-# Upload results to S3
-aws s3 cp data/experiments/ s3://BUCKET_NAME/results/ --recursive
-
-# Shutdown instance when done
-shutdown -h now
+# Create launch template data
+cat > launch-template-data.json << EOF
+{
+  "ImageId": "$AMI_ID",
+  "InstanceType": "t3.medium",
+  "IamInstanceProfile": {
+    "Name": "ExperimentRunnerProfile"
+  },
+  "SecurityGroupIds": ["sg-xxxxxxxxx"],
+  "UserData": "$(base64 -w 0 user-data.sh)",
+  "TagSpecifications": [
+    {
+      "ResourceType": "instance",
+      "Tags": [
+        {
+          "Key": "Name",
+          "Value": "ExperimentRunner"
+        },
+        {
+          "Key": "Project",
+          "Value": "AdaptiveRobotNavigation"
+        }
+      ]
+    }
+  ]
+}
 EOF
 
 # Create launch template
 aws ec2 create-launch-template \
-    --launch-template-name ExperimentRunnerTemplate \
-    --version-description v1 \
-    --launch-template-data "ImageId=$AMI_ID,InstanceType=t3.medium,IamInstanceProfile={Name=ExperimentRunnerProfile},UserData=$(base64 -w 0 user-data.sh)"
+  --launch-template-name ExperimentRunnerTemplate \
+  --launch-template-data file://launch-template-data.json
 ```
 
 ### Launch Instance
 ```bash
-# Launch instance
+# Launch instance using template
 aws ec2 run-instances \
-    --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=1 \
-    --instance-type t3.medium \
-    --key-name your-key-pair-name \
-    --security-group-ids sg-xxxxxxxxx \
-    --subnet-id subnet-xxxxxxxxx \
-    --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ExperimentRunner}]'
+  --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=\$Latest \
+  --count 1 \
+  --query 'Instances[0].InstanceId' \
+  --output text
 ```
 
-## Step 5: Monitor and Retrieve Results
+## Step 5: Monitor and Download Results
 
-### Monitor Instance
+### Monitor Instance Status
 ```bash
 # Check instance status
-aws ec2 describe-instances --filters "Name=tag:Name,Values=ExperimentRunner" --query "Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name,PublicIP:PublicIpAddress}"
-
-# Get instance logs
-aws logs describe-log-groups --log-group-name-prefix /aws/ec2/ExperimentRunner
+aws ec2 describe-instances \
+  --instance-ids i-xxxxxxxxx \
+  --query 'Reservations[0].Instances[0].State.Name' \
+  --output text
 ```
 
-### Retrieve Results
+### Download Results
 ```bash
-# Download results from S3
+# Download results when experiment completes
 aws s3 sync s3://adaptive-robot-experiments-$(date +%s)/results/ ./results/
 ```
 
-## Step 6: Advanced Setup with Auto Scaling
+## Advanced Configuration
 
-### Create Auto Scaling Group
+### Security Groups
 ```bash
-# Create launch template for auto scaling
+# Create security group
+aws ec2 create-security-group \
+  --group-name ExperimentRunnerSG \
+  --description "Security group for experiment runners"
+
+# Allow SSH access (optional)
+aws ec2 authorize-security-group-ingress \
+  --group-name ExperimentRunnerSG \
+  --protocol tcp \
+  --port 22 \
+  --cidr 0.0.0.0/0
+```
+
+### Auto Scaling (Optional)
+```bash
+# Create auto scaling group for multiple experiments
 aws autoscaling create-auto-scaling-group \
-    --auto-scaling-group-name ExperimentRunnerASG \
-    --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=1 \
-    --min-size 0 \
-    --max-size 5 \
-    --desired-capacity 1 \
-    --vpc-zone-identifier "subnet-xxxxxxxxx,subnet-yyyyyyyyy"
+  --auto-scaling-group-name ExperimentRunnerASG \
+  --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=\$Latest \
+  --min-size 0 \
+  --max-size 10 \
+  --desired-capacity 1 \
+  --vpc-zone-identifier subnet-xxxxxxxxx
 ```
 
-### Create CloudWatch Dashboard
+## Cost Optimization
+
+### Spot Instances
 ```bash
-# Create dashboard for monitoring
-aws cloudwatch put-dashboard \
-    --dashboard-name ExperimentRunnerDashboard \
-    --dashboard-body '{
-        "widgets": [
-            {
-                "type": "metric",
-                "properties": {
-                    "metrics": [
-                        ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "ExperimentRunnerASG"]
-                    ],
-                    "period": 300,
-                    "stat": "Average",
-                    "region": "us-east-1",
-                    "title": "CPU Utilization"
-                }
-            }
-        ]
-    }'
+# Use spot instances for cost savings
+aws ec2 run-instances \
+  --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=\$Latest \
+  --instance-market-options MarketType=spot,SpotOptions={MaxPrice=0.05} \
+  --count 1
 ```
 
-## Step 7: Cost Optimization
-
-### Use Spot Instances
-```bash
-# Create spot fleet request for cost savings
-aws ec2 request-spot-fleet \
-    --spot-fleet-request-config '{
-        "AllocationStrategy": "lowestPrice",
-        "TargetCapacity": 1,
-        "SpotPrice": "0.05",
-        "LaunchSpecifications": [
-            {
-                "ImageId": "'$AMI_ID'",
-                "InstanceType": "t3.medium",
-                "SubnetId": "subnet-xxxxxxxxx",
-                "IamInstanceProfile": {"Name": "ExperimentRunnerProfile"},
-                "UserData": "'$(base64 -w 0 user-data.sh)'"
-            }
-        ]
-    }'
-```
-
-### Set Up Budget Alerts
-```bash
-# Create budget alert
-aws budgets create-budget \
-    --account-id $(aws sts get-caller-identity --query Account --output text) \
-    --budget '{
-        "BudgetName": "ExperimentBudget",
-        "BudgetLimit": {
-            "Amount": "10.00",
-            "Unit": "USD"
-        },
-        "TimeUnit": "MONTHLY",
-        "BudgetType": "COST"
-    }' \
-    --notifications-with-subscribers '[
-        {
-            "Notification": {
-                "ComparisonOperator": "GREATER_THAN",
-                "NotificationType": "ACTUAL",
-                "Threshold": 80.0,
-                "ThresholdType": "PERCENTAGE"
-            },
-            "Subscribers": [
-                {
-                    "Address": "your-email@example.com",
-                    "SubscriptionType": "EMAIL"
-                }
-            ]
-        }
-    ]'
-```
-
-## Step 8: Automation Scripts
-
-### Create Deployment Script
-```bash
-cat > deploy_experiment.sh << 'EOF'
-#!/bin/bash
-
-# Configuration
-BUCKET_NAME="adaptive-robot-experiments-$(date +%s)"
-REGION="us-east-1"
-INSTANCE_TYPE="t3.medium"
-EXPERIMENT_TYPE=${1:-basic}
-EPISODES=${2:-500}
-
-echo "Deploying experiment: $EXPERIMENT_TYPE with $EPISODES episodes"
-
-# Create S3 bucket
-aws s3 mb s3://$BUCKET_NAME --region $REGION
-
-# Upload project
-aws s3 cp project.zip s3://$BUCKET_NAME/project.zip
-
-# Update user data with experiment parameters
-sed "s/BUCKET_NAME/$BUCKET_NAME/g" user-data.sh > user-data-updated.sh
-sed -i "s/basic/$EXPERIMENT_TYPE/g" user-data-updated.sh
-sed -i "s/500/$EPISODES/g" user-data-updated.sh
-
-# Launch instance
-INSTANCE_ID=$(aws ec2 run-instances \
-    --launch-template LaunchTemplateName=ExperimentRunnerTemplate,Version=1 \
-    --instance-type $INSTANCE_TYPE \
-    --user-data file://user-data-updated.sh \
-    --query 'Instances[0].InstanceId' \
-    --output text)
-
-echo "Instance launched: $INSTANCE_ID"
-echo "Bucket created: $BUCKET_NAME"
-echo "Monitor progress: aws s3 ls s3://$BUCKET_NAME/results/"
-EOF
-
-chmod +x deploy_experiment.sh
-```
-
-## Usage Examples
-
-### Run Basic Experiment
-```bash
-./deploy_experiment.sh basic 500
-```
-
-### Run Comparison Experiment
-```bash
-./deploy_experiment.sh comparison 100
-```
-
-### Monitor Progress
-```bash
-# Check if results are being generated
-aws s3 ls s3://your-bucket-name/results/
-
-# Download results when complete
-aws s3 sync s3://your-bucket-name/results/ ./local-results/
-```
-
-## Cost Estimation
-
-### T3.Medium Instance (Recommended)
-- **CPU**: 2 vCPUs
-- **Memory**: 4 GB RAM
-- **Cost**: ~$0.0416/hour
-- **500 episodes**: ~2-4 hours = $0.08-$0.17
-
-### T3.Large Instance (Faster)
-- **CPU**: 2 vCPUs
-- **Memory**: 8 GB RAM
-- **Cost**: ~$0.0832/hour
-- **500 episodes**: ~1-2 hours = $0.08-$0.17
-
-### Spot Instances (Cheapest)
-- **Cost**: 60-90% discount
-- **Risk**: Can be terminated
-- **Best for**: Non-critical experiments
+### Instance Types
+- **t3.micro**: Free tier, suitable for small experiments
+- **t3.small**: $0.0208/hour, good for medium experiments
+- **t3.medium**: $0.0416/hour, recommended for most experiments
+- **c5.large**: $0.085/hour, for compute-intensive experiments
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Instance not starting**: Check IAM roles and security groups
-2. **Dependencies failing**: Check user data script and Python versions
-3. **Results not uploading**: Verify S3 bucket permissions
-4. **High costs**: Use spot instances and set budget alerts
+
+1. **Instance fails to start**
+   - Verify IAM role permissions
+   - Check security group configuration
+   - Ensure sufficient quota
+
+2. **Experiment fails to run**
+   - Check S3 bucket permissions
+   - Verify user data script
+   - Review CloudWatch logs
+
+3. **Results not uploaded**
+   - Check S3 bucket policy
+   - Verify IAM role has S3 permissions
+   - Review experiment logs
 
 ### Debug Commands
 ```bash
-# Check instance status
-aws ec2 describe-instance-status --instance-ids i-xxxxxxxxx
-
-# Get console output
+# Get instance console output
 aws ec2 get-console-output --instance-id i-xxxxxxxxx
 
 # Check S3 bucket contents
-aws s3 ls s3://your-bucket-name/ --recursive
+aws s3 ls s3://your-bucket-name/results/
+
+# Monitor instance in real-time
+aws ec2 describe-instances --instance-ids i-xxxxxxxxx --query 'Reservations[0].Instances[0].{State:State.Name,PublicIP:PublicIpAddress}'
 ```
 
-## Next Steps
+## Best Practices
 
-1. **Set up monitoring**: Create CloudWatch dashboards
-2. **Automate cleanup**: Create Lambda functions to terminate instances
-3. **Scale experiments**: Use multiple instances for parallel experiments
-4. **Optimize costs**: Use reserved instances for regular experiments
+1. **Security**
+   - Use IAM roles with minimal permissions
+   - Implement proper security groups
+   - Regularly rotate access keys
 
-This setup gives you a professional AWS deployment that's scalable, cost-effective, and suitable for production research environments. 
+2. **Cost Management**
+   - Use spot instances when possible
+   - Set up billing alerts
+   - Terminate instances promptly
+
+3. **Reliability**
+   - Implement proper error handling
+   - Use CloudWatch for monitoring
+   - Backup important results
+
+4. **Scalability**
+   - Use auto scaling for multiple experiments
+   - Implement proper resource tagging
+   - Monitor resource usage
+
+## Cleanup
+
+### Terminate Resources
+```bash
+# Terminate instance
+aws ec2 terminate-instances --instance-ids i-xxxxxxxxx
+
+# Delete launch template
+aws ec2 delete-launch-template --launch-template-name ExperimentRunnerTemplate
+
+# Delete IAM role (after detaching from instance profile)
+aws iam remove-role-from-instance-profile --instance-profile-name ExperimentRunnerProfile --role-name ExperimentRunnerRole
+aws iam delete-instance-profile --instance-profile-name ExperimentRunnerProfile
+aws iam delete-role --role-name ExperimentRunnerRole
+
+# Delete S3 bucket (after removing all objects)
+aws s3 rb s3://your-bucket-name --force
+``` 

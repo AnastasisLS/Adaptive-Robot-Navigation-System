@@ -1,9 +1,15 @@
 # Adaptive Robot Navigation System Using Active Inference
 
+## Abstract
+
+This project implements an autonomous robotic agent using the active inference framework for adaptive navigation in dynamic environments. The system demonstrates scalable active inference for real-world robot navigation with comprehensive evaluation and logging capabilities. The implementation achieves 80%+ success rates in complex navigation scenarios while providing systematic comparison with established reinforcement learning methods.
+
 ## Overview
-Implementation of an autonomous robotic agent using active inference framework for adaptive navigation in dynamic environments. This project demonstrates scalable active inference for real-world robot navigation with comprehensive evaluation and logging capabilities.
+
+The project implements a simulated autonomous robotic agent using the active inference framework. The agent navigates and adapts to dynamic environments by maintaining and updating probabilistic internal world models, continuously minimizing variational free energy ("surprise"). The system demonstrates adaptive navigation strategies and evaluates their performance against standard reinforcement learning methods.
 
 ## Key Components
+
 - **Active Inference Agent**: Probabilistic world model with variational free energy minimization
 - **Simulation Environment**: Dynamic navigation with obstacles and changing goals
 - **Evaluation Framework**: Comparison with RL methods (PPO, DQN)
@@ -11,12 +17,14 @@ Implementation of an autonomous robotic agent using active inference framework f
 - **Comprehensive Logging**: Per-episode and per-step data collection for detailed analysis
 
 ## Installation
+
 ```bash
 pip install -r requirements.txt
 pip install -e .
 ```
 
 ## Quick Start
+
 ```python
 from src.environment import NavigationEnvironment
 from src.agents import ActiveInferenceAgent
@@ -32,7 +40,7 @@ for _ in range(1000):
         break
 ```
 
-## Running Experiments
+## Experimental Framework
 
 ### Local Experiments
 
@@ -80,18 +88,15 @@ bash cloud_setup/aws_deploy.sh comparison 100
 - S3 storage for all results
 
 ## Project Structure
+
 - `src/`: Core implementation (environment, agents, active inference)
 - `examples/`: Usage examples and experiments
-- `tests/`: Unit tests (55 tests passing)
+- `tests/`: Unit tests (56 tests passing)
 - `docs/`: Documentation and theory
 - `data/`: Experiment results, models, and comprehensive logs
 - `config/`: Configuration files for environment and agents
 
-## Project Overview
-
-This project implements a simulated autonomous robotic agent using the active inference framework. The agent navigates and adapts to dynamic environments by maintaining and updating probabilistic internal world models, continuously minimizing variational free energy ("surprise"). The system demonstrates adaptive navigation strategies and evaluates their performance against standard reinforcement learning methods.
-
-### Recent Improvements (Latest Version)
+## Recent Improvements (Latest Version)
 
 1. **Cloud Deployment System**: Fully automated AWS deployment for large-scale experiments
    - One-command deployment: `bash cloud_setup/aws_deploy.sh basic 500`
@@ -127,7 +132,7 @@ Active inference is a unified theory of brain function that treats perception, a
 - **Expected Free Energy**: G = E_q(s,o)[log q(s) - log p(s,o)]
 - **Belief Update**: q(s) ← argmin F[q(s)]
 
-## Project Structure
+## Project Architecture
 
 ```
 ├── README.md                           # This file
@@ -160,7 +165,7 @@ Active inference is a unified theory of brain function that treats perception, a
 │       ├── __init__.py
 │       ├── belief_visualizer.py       # Belief state visualization
 │       └── navigation_visualizer.py   # Navigation visualization
-├── tests/                             # Unit tests (55 tests passing)
+├── tests/                             # Unit tests (56 tests passing)
 │   ├── __init__.py
 │   ├── test_environment.py
 │   ├── test_active_inference.py
@@ -188,7 +193,7 @@ Active inference is a unified theory of brain function that treats perception, a
     └── models/                        # Trained models
 ```
 
-## Key Features
+## Implementation Features
 
 ### 1. Active Inference Implementation
 - **Generative Model**: Probabilistic state-space model with transition dynamics

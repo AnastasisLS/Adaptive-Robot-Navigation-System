@@ -1,8 +1,8 @@
 # AWS Quick Start Guide
 
-## 🚀 Get Your Experiments Running in 5 Minutes
+## Rapid Experiment Deployment
 
-This guide will get your Adaptive Robot Navigation experiments running on AWS EC2 without keeping your computer on.
+This guide provides instructions for deploying Adaptive Robot Navigation experiments on AWS EC2 without requiring local computational resources.
 
 ## Prerequisites (One-time setup)
 
@@ -26,7 +26,7 @@ Enter your AWS credentials when prompted:
 - **Default region**: `us-east-1` (recommended)
 - **Output format**: `json`
 
-## 🎯 Quick Start (3 Steps)
+## Quick Start (3 Steps)
 
 ### Step 1: Run the Deployment Script
 ```bash
@@ -49,24 +49,24 @@ The script will automatically monitor your experiment and show you:
 aws s3 sync s3://your-bucket-name/results/ ./results/
 ```
 
-## 📊 What You Get
+## System Features
 
 ### Automatic Setup
-- ✅ S3 bucket for result storage
-- ✅ EC2 instance with all dependencies
-- ✅ IAM roles and security groups
-- ✅ Automatic experiment execution
-- ✅ Results uploaded to S3
-- ✅ Instance auto-shutdown when done
+- S3 bucket for result storage
+- EC2 instance with all dependencies
+- IAM roles and security groups
+- Automatic experiment execution
+- Results uploaded to S3
+- Instance auto-shutdown when done
 
 ### Results Include
-- 📈 Training curves and metrics
-- 📊 Success rates and performance data
-- 🗂️ Per-episode and per-step logs
-- 📁 Trajectory data for analysis
-- 📋 JSON files with detailed statistics
+- Training curves and metrics
+- Success rates and performance data
+- Per-episode and per-step logs
+- Trajectory data for analysis
+- JSON files with detailed statistics
 
-## 💰 Cost Estimation
+## Cost Estimation
 
 ### T3.Medium Instance (Recommended)
 - **Cost**: ~$0.0416/hour
@@ -77,7 +77,7 @@ aws s3 sync s3://your-bucket-name/results/ ./results/
 - **AWS Free Tier**: 750 hours/month of t2.micro
 - **Perfect for**: Testing and small experiments
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Custom Experiments
 ```bash
@@ -101,121 +101,62 @@ aws ec2 describe-instances --instance-ids i-xxxxxxxxx
 aws s3 ls | grep adaptive-robot-experiments
 
 # Download specific experiment results
-aws s3 sync s3://adaptive-robot-experiments-20241201_143022/results/ ./results/
+aws s3 sync s3://adaptive-robot-experiments-YYYYMMDDHHMMSS/results/ ./results/
 ```
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-**"AWS CLI not configured"**
-```bash
-aws configure
-# Enter your credentials
-```
+1. **Instance fails to start**
+   - Check AWS credentials and permissions
+   - Verify region availability
+   - Ensure sufficient quota for EC2 instances
 
-**"Permission denied"**
-```bash
-# Make script executable
-chmod +x cloud_setup/aws_deploy.sh
-```
+2. **Experiment fails to run**
+   - Check S3 bucket permissions
+   - Verify IAM role has necessary permissions
+   - Review experiment logs in S3
 
-**"Instance not starting"**
+3. **Results not downloaded**
+   - Verify S3 bucket name
+   - Check local directory permissions
+   - Ensure experiment completed successfully
+
+### Debug Commands
+
 ```bash
 # Check instance status
 aws ec2 describe-instances --instance-ids i-xxxxxxxxx
 
-# Get console output
+# View experiment logs
+aws s3 cp s3://your-bucket/results/experiment_output.log -
+
+# Monitor instance in real-time
 aws ec2 get-console-output --instance-id i-xxxxxxxxx
 ```
 
-**"Results not uploading"**
-```bash
-# Check S3 bucket
-aws s3 ls s3://your-bucket-name/results/
-```
+## Security Considerations
 
-### Get Help
-```bash
-# Show script usage
-./cloud_setup/aws_deploy.sh
+- All instances use IAM roles with minimal required permissions
+- Security groups restrict access to necessary ports only
+- S3 buckets are private by default
+- Instances auto-terminate after experiment completion
+- No persistent storage of sensitive data
 
-# Check AWS CLI version
-aws --version
+## Best Practices
 
-# Test AWS connection
-aws sts get-caller-identity
-```
+1. **Cost Management**
+   - Use spot instances for cost optimization
+   - Set up billing alerts
+   - Monitor instance usage
 
-## 📈 Example Output
+2. **Experiment Design**
+   - Start with small experiments to validate setup
+   - Use appropriate instance types for workload
+   - Implement proper error handling
 
-```
-[2024-12-01 14:30:22] Checking prerequisites...
-[SUCCESS] Prerequisites check passed
-[2024-12-01 14:30:23] Creating S3 bucket: adaptive-robot-experiments-20241201_143022
-[SUCCESS] S3 bucket created: adaptive-robot-experiments-20241201_143022
-[2024-12-01 14:30:25] Creating IAM role for EC2...
-[SUCCESS] IAM role created
-[2024-12-01 14:30:35] Preparing project for upload...
-[SUCCESS] Project archive created: project.zip
-[2024-12-01 14:30:40] Uploading project to S3...
-[SUCCESS] Project uploaded to S3
-[2024-12-01 14:30:45] Creating user data script...
-[SUCCESS] User data script created
-[2024-12-01 14:30:50] Getting latest Ubuntu AMI...
-[SUCCESS] Using AMI: ami-0c02fb55956c7d316
-[2024-12-01 14:30:55] Creating launch template...
-[SUCCESS] Launch template created
-[2024-12-01 14:31:00] Launching EC2 instance...
-[SUCCESS] Instance launched: i-0a1b2c3d4e5f6g7h8
-[SUCCESS] Deployment completed successfully!
-[SUCCESS] Instance ID: i-0a1b2c3d4e5f6g7h8
-[SUCCESS] S3 Bucket: adaptive-robot-experiments-20241201_143022
-
-=== Monitoring Commands ===
-Check instance status:
-  aws ec2 describe-instances --instance-ids i-0a1b2c3d4e5f6g7h8
-Check experiment progress:
-  aws s3 ls s3://adaptive-robot-experiments-20241201_143022/results/
-Download results when complete:
-  aws s3 sync s3://adaptive-robot-experiments-20241201_143022/results/ ./results/
-
-Starting automatic monitoring (press Ctrl+C to stop)...
-[14:31:30] Instance: running, Results: 0 files
-[14:32:00] Instance: running, Results: 5 files
-[14:32:30] Instance: running, Results: 12 files
-...
-[SUCCESS] Experiment completed!
-```
-
-## 🎓 Learning AWS Skills
-
-This setup teaches you:
-- **EC2**: Virtual machines in the cloud
-- **S3**: Object storage for results
-- **IAM**: Identity and access management
-- **CloudWatch**: Monitoring and logging
-- **CLI**: Command-line automation
-- **Infrastructure as Code**: Automated deployment
-
-## 🚀 Next Steps
-
-1. **Scale up**: Run multiple experiments in parallel
-2. **Optimize costs**: Use spot instances for 60-90% savings
-3. **Add monitoring**: Create CloudWatch dashboards
-4. **Automate cleanup**: Set up Lambda functions
-5. **Production deployment**: Use AWS Batch for large-scale experiments
-
-## 📞 Support
-
-- **AWS Documentation**: https://docs.aws.amazon.com/
-- **AWS Free Tier**: https://aws.amazon.com/free/
-- **Project Issues**: Check the main README.md
-
----
-
-**Ready to run your first cloud experiment?** 🚀
-
-```bash
-./cloud_setup/aws_deploy.sh basic 500
-``` 
+3. **Data Management**
+   - Regularly backup important results
+   - Use descriptive bucket names
+   - Clean up old experiments periodically 
